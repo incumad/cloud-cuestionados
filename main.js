@@ -154,15 +154,40 @@ Parse.Cloud.define("getCurrentQuestionsUser", function(request, response) {
   });
 });
   
- 
-  
-  
-  
 Parse.Cloud.job("lanzaPregunta", function(request, status) {
+    
+    Parse.Cloud.run("lanzaPreguntaChannel",{channel:'esp'},{
+            success: function(results){
+                 response.success("job esp ejecutado con exito");
+            },
+            error: function() {
+                 status.error("No se ejecuto correctamente el cloud job esp");
+            } 
+    });
+    
+    Parse.Cloud.run("lanzaPreguntaChannel",{channel:'eng'},{
+            success: function(results){
+                 response.success("job eng ejecutado con exito");
+            },
+            error: function() {
+                 status.error("No se ejecuto correctamente el cloud job eng");
+            } 
+    });    
+
+});
+
+
+/**
+ * Lanza las preguntas generadas a un determinado canal
+ * 
+ * @params usuarioId  
+ * @return {array} preguntas
+ */
+Parse.Cloud.define("lanzaPreguntaChannel", function(request, status) {
     Parse.Cloud.useMasterKey();
  
     var now = new Date();
-  
+    
      
     var oPreguntaNueva = Parse.Object.extend("PreguntaNueva");
     var preguntaNuevaQuery = new Parse.Query(oPreguntaNueva);
@@ -172,7 +197,7 @@ Parse.Cloud.job("lanzaPregunta", function(request, status) {
     preguntaNuevaQuery.greaterThanOrEqualTo("moderarHasta",now);
     preguntaNuevaQuery.notEqualTo("indUso", '1');
     //preguntaNuevaQuery.equalTo("idioma", request.params.channel);    
-    preguntaNuevaQuery.equalTo("idioma", 'esp');
+    preguntaNuevaQuery.equalTo("idioma", request.params.channel);
     preguntaNuevaQuery.lessThan("votosContra",limitContra);
     preguntaNuevaQuery.descending("votosFavor");
  
@@ -180,103 +205,82 @@ Parse.Cloud.job("lanzaPregunta", function(request, status) {
       success: function(object) {
            if (typeof object == "undefined") {
                 // no hay preguntas con lo que paro
-                 
-                return;
+                status.error("No hay preguntas que lanzar en." + request.params.channel + " a las " + now.toLocaleString());
             } else {
-                                 
-                     
-                            object.set('indUso','1');
-                                 
- 
-                 
-                                  object.save();
-                                   
-                                   
-                                    //success: function(object2) {
-                                        //  alert('New object created with objectId1: ');
-     
-                                        //OBTENEMOS LOS DATOS
-                                          var texto = object.get("texto");
-                                          var acierto1 = object.get("acierto1");
-                                          var acierto2 = object.get("acierto2");
-                                          var acierto3 = object.get("acierto3");
-                                          var acierto4 = object.get("acierto4");
-                                          var creadorIdFB = object.get("creadorIdFB");
-                                          var creadorNombre = object.get("creadorNombre");
-                                          var horas = object.get("horas");
-                                          var idioma = object.get("idioma");
-                                          var respuesta1 = object.get("respuesta1");
-                                          var respuesta2 = object.get("respuesta2");
-                                          var respuesta3 = object.get("respuesta3");
-                                          var respuesta4 = object.get("respuesta4");
-                                           
-                                          //LOS GUARDAMOS EN PREGUNTA
-                                           
-                                           
-                                            var diasVidaIniciales = 1;
-                                        var horasPreg = parseInt(diasVidaIniciales * (8*60*60*1000));//8h
-                                        var timePreg = new Date();
+                object.set('indUso','1');
+                object.save();
+
+                //OBTENEMOS LOS DATOS
+                var texto = object.get("texto");
+                var acierto1 = object.get("acierto1");
+                var acierto2 = object.get("acierto2");
+                var acierto3 = object.get("acierto3");
+                var acierto4 = object.get("acierto4");
+                var creadorIdFB = object.get("creadorIdFB");
+                var creadorNombre = object.get("creadorNombre");
+                var horas = object.get("horas");
+                var idioma = object.get("idioma");
+                var respuesta1 = object.get("respuesta1");
+                var respuesta2 = object.get("respuesta2");
+                var respuesta3 = object.get("respuesta3");
+                var respuesta4 = object.get("respuesta4");
+
+                //LOS GUARDAMOS EN PREGUNTA
+                var horasCaducidadPregunta = 8;
+                var horasPreg = parseInt(horasCaducidadPregunta * 60*60*1000);
+                var timePreg = new Date();
+                
+                var Pregunta = Parse.Object.extend("Pregunta");
+                timePreg.setTime(timePreg.getTime() + horasPreg);//8h
+
+                var preg = new Pregunta();
+
+                preg.set('texto',texto);
+                preg.set('respuesta1',respuesta1);    
+                preg.set('respuesta2',respuesta2);    
+                preg.set('respuesta3',respuesta3);    
+                preg.set('respuesta4',respuesta4);    
+                preg.set('idioma',idioma);    
+                preg.set('horas',horas);  
+                preg.set('fechaFin',timePreg);    
+                preg.set('acierto1',acierto1);    
+                preg.set('acierto2',acierto2);    
+                preg.set('acierto3',acierto3);    
+                preg.set('acierto4',acierto4);    
+                preg.set('creador',creadorNombre);                
+
                                              
-                                             
-                                       
-                                         
-                                        timePreg.setTime(timePreg.getTime() + (diasVidaIniciales * 8*60*60*1000));//8h
-                                        //timePreg.setTime(timePreg.getTime() + horasPreg);///////////////////////////esto fallaba
-                                     
-                                          var Pregunta = Parse.Object.extend("Pregunta");
-                                           
-                                  var preg = new Pregunta();
-                                         
-                                          preg.set('texto',texto);
-                                          preg.set('respuesta1',respuesta1);    
-                                          preg.set('respuesta2',respuesta2);    
-                                          preg.set('respuesta3',respuesta3);    
-                                          preg.set('respuesta4',respuesta4);    
-                                          preg.set('idioma',idioma);    
-                                          preg.set('horas',horas);  
-                                          preg.set('fechaFin',timePreg);    
-                                          preg.set('acierto1',acierto1);    
-                                          preg.set('acierto2',acierto2);    
-                                          preg.set('acierto3',acierto3);    
-                                          preg.set('acierto4',acierto4);    
-                                          preg.set('creador',creadorNombre);                
-                                               
-                                             
-                                          preg.save(null, {
-                                              success: function(pregun) {
-                                                // Execute any logic that should take place after the object is saved.
-                                                
-                                                     
-                                                alert('New object created with objectId2: ');               
-                                               
-                                            Parse.Push.send({//push
-                                              channels: ["esp"],
-                                              expiration_interval: 480,
-                                              data: {
-                                                alert: "Prueba job: " +object.get('texto')
-                                              }
-                                            }, {
-                                            success: function() {
-                                                 status.success("Pregunta enviada.");
-                                            },
-                                            error: function(error) {
-                                                status.error("Pregunta fallida.");
-                                              }
-                                            });//push
-                                              },
-                                              error: function(pregun, error) {
-                                                // Execute any logic that should take place if the save fails.
-                                                // error is a Parse.Error with an error code and message.
-                                                alert('Failed to create new object, with error code: ' + error.message);
-                                                status.error("Pregunta fallida.");
-                                              }
-                                            });
-                    }//else
+                preg.save(null, {
+                    success: function(pregun) {
+                        
+                        var sTxt = [];
+                        sTxt['esp'] = "Tienes una nueva pregunta!";
+                        sTxt['end'] = "You have a new question!";
+                        
+                        // Execute any logic that should take place after the object is saved.
+                        Parse.Push.send({//push
+                            channels: [request.params.channel],
+                            expiration_interval: 480,
+                        data: {
+                            alert: sTxt[request.params.channel] + ' ' + object.get('texto').substring(0,15) + '...'
+                        }
+                        }, {
+                            success: function() {
+                                 status.success("Pregunta enviada.");
+                            },
+                            error: function(error) {
+                                status.error("Pregunta fallida.");
+                              }
+                            });//push
+                        },
+                    error: function(pregun, error) {
+                          status.error('Failed to create new object, with error code: ' + error.message);
+                    }
+                  });
+            }
       },//succes 
       error: function(error) {
-        alert("Error: " + error.code + " " + error.message);
-        status.error("Pregunta fallida.");
+        status.error("Error: " + error.code + " " + error.message);
       }//error
       });//preguntaNuevaQuery.first
-  
 });
