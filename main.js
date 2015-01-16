@@ -441,9 +441,12 @@ Parse.Cloud.define("saveNewQuestion", function(request, status) {
         
     oPreguntaNueva.set('moderarHasta',fechaFinPregunta);
     oPreguntaNueva.set('moderarDesde',now);
+    
+    oPreguntaNueva.set('votosContra',0);
+    oPreguntaNueva.set('votosFavor',0);
         
     oPreguntaNueva.set('horas', WINHOURS);
-    oPreguntaNueva.set('creadorIdFB',request.params.creadorNombre);
+    oPreguntaNueva.set('creadorIdFB',request.params.creadorIdFB);
     oPreguntaNueva.set('creadorNombre',request.params.creadorNombre);
     oPreguntaNueva.set('idioma',request.params.idioma);
     oPreguntaNueva.set('respuesta1',request.params.respuesta1);
@@ -534,3 +537,65 @@ Parse.Cloud.define("dieProcess", function(request, status) {
         }//error
     });
 });
+
+/**
+ * Cuando un usuario modera una pregunta
+ * 
+ * @params json (usuario, horas apostadas)
+ */
+Parse.Cloud.define("moderaProcess", function(request, status) {
+        
+    var query = new Parse.Query("PreguntaNueva");
+    query.equalTo("objectId", request.params.id);
+    query.first({    
+        success: function(object) {
+            var votosContra = object.get("votosContra");
+            var votosFavor = object.get("votosFavor");
+            
+            if (request.params.option == 1) {
+                 object.set('votosFavor', votosFavor + 1);
+            } else {
+                 object.set('votosContra', votosContra + 1);
+            }
+  
+            object.save(null, {
+                success: function(rs) {
+                    
+                    var query = new Parse.Query("Usuario");
+                    query.equalTo("objectId", request.params.userObjectId);
+
+                    query.first({    
+                            success: function(object) {
+                                var msPorModerar = 30 * 60 * 1000; // 30 minutos
+                                
+                                var finishDate = object.get("finish_time");
+                                var fechaFinal = new Date(finishDate);
+
+                                fechaFinal.setTime(fechaFinal.getTime() + msPorModerar);
+
+                                object.set('finish_time', fechaFinal);
+                                object.save(null, {
+                                    success: function(rs) {
+                                        status.success("Pregunta moderada.");
+                                    },
+                                    error: function(error) {
+                                        status.error("Error salvando el tiempo por moderar: " + error.code + " " + error.message);
+                                    }
+                                });
+                            },
+                            error: function(error) {
+                                status.error("Error cogiendo el usuario para sumar tiempo: " + error.code + " " + error.message);
+                            }//error
+                        });
+                },
+                error: function(error) {
+                    status.error("Error moderando pregunta: " + error.code + " " + error.message);
+                }
+            });
+        },
+        error: function(error) {
+            status.error("Error cogiendo la pregunta para moderar: " + error.code + " " + error.message);
+        }//error
+    });        
+        
+    });
