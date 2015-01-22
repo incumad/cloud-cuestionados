@@ -129,8 +129,8 @@ Parse.Cloud.define("getInitSettings", function(request, response) {
  
             var daysOflive = (t1 - t2) / (1000 * 60 * 60 * 24);
  
-            if (daysOflive < 2) {
-                daysOflive = 2;
+            if (daysOflive < 0) {
+                daysOflive = 0;
             }
  
             response.success({msToDie:msToDye,daysOfLive: Math.floor(daysOflive)});
@@ -443,7 +443,7 @@ Parse.Cloud.define("saveNewQuestion", function(request, status) {
     oPreguntaNueva.set('moderarDesde',now);
     
     oPreguntaNueva.set('votosContra',0);
-    oPreguntaNueva.set('votosFavor',0);
+    oPreguntaNueva.set('votosFavor',request.params.votosFavor);
         
     oPreguntaNueva.set('horas', WINHOURS);
     oPreguntaNueva.set('creadorIdFB',request.params.creadorIdFB);
@@ -457,10 +457,38 @@ Parse.Cloud.define("saveNewQuestion", function(request, status) {
          
     oPreguntaNueva.save(null, {
                     success: function(preg) {
-                        status.success("Pregunta salvada");
+                        // le damos tiempo al usuario
+                        var query = new Parse.Query("Usuario");
+                        query.equalTo("idFB", request.params.creadorIdFB);
+                        query.first({    
+                            success: function(object) {
+                                var finishDate = object.get("finish_time");
+                                var fechaFinal = new Date(finishDate);
+                                var horasPorPregunta = 3;
+
+                                fechaFinal.setTime(fechaFinal.getTime() + (horasPorPregunta * 60 * 60 * 1000));
+
+                                object.set('finish_time', fechaFinal);
+                                object.save(null, {
+                                    success: function(rs) {
+                                        status.success("Tiempo por pregunta dado.");
+                                    },
+                                    error: function(error) {
+                                        status.error("Error dando tiempo por preguntar: " + error.code + " " + error.message);
+                                    }
+                                }); 
+
+                            },
+                            error: function(error) {
+                                status.error("Error cogiendo el usuario para darle tiempo por preguntar: " + error.code + " " + error.message);
+                            }//error
+                        });
+                        
+                        
+                        
                     },
                     error: function(error) {
-                        status.error("Error: " + error.code + " " + error.message);
+                        status.error("Error salvando la pregunta: " + error.code + " " + error.message);
                     }
                   });
 });
@@ -554,8 +582,12 @@ Parse.Cloud.define("moderaProcess", function(request, status) {
             
             if (request.params.option == 1) {
                  object.set('votosFavor', votosFavor + 1);
+            } else if (request.params.option == 3) {
+                 object.set('votosFavor', votosFavor + 1000);
+            } else if (request.params.option == 4) {
+                 object.set('votosContra', votosContra + 1000);
             } else {
-                 object.set('votosContra', votosContra + 1);
+                object.set('votosContra', votosContra + 1);
             }
   
             object.save(null, {
